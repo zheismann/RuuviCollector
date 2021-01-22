@@ -6,7 +6,7 @@
 #influxUrl=http://localhost:8086
 
 # InfluxDB Database to use for measurements
-#influxDatabase=ruuvi
+influxDatabase=ruuvi
 
 # InfluxDB measurement name to use for measurements
 #influxMeasurement=ruuvi_measurements
@@ -47,7 +47,7 @@
 # influxdb_legacy = The old format used by this collector on versions before 0.2.0, stores values into separate measurements.
 #                   NOTE: influxdb_legacy is no longer supported, you should use the new influxdb format and migrate old data, see CHANGELOG.md
 # dummy           = Logs the measurements to the log rather than sending them anywhere, feasible for testing and development
-#storage.method=influxdb
+storage.method=influxdb
 
 # Values to store, the collector is capable of calculating additional values from the values received from a tag, for example absolute humidity and dew point
 # Valid values "raw", "extended", "whitelist", "blacklist":
@@ -56,13 +56,13 @@
 #             Ignores the storage.values.list property. NOTE: the influxdb_legacy storage method does not support extended values
 # whitelist = Only the values given in the storage.values.list property are stored. (influxdb_legacy storage method not supported.)
 # blacklist = Only the values not given in the storage.values.list property are stored. (influxdb_legacy storage method not supported.)
-#storage.values=extended
+storage.values=whitelist
 
 # See MEASUREMENTS.md for all the field names that can be used with storage.values.list.
 # Note that leaving this list empty while setting storage.values=whitelist results in an exception: no sensor data
 # would be stored with this combination. Setting storage.values=blacklist and leaving this list empty only results
 # in a warning, as that is essentially just the same as setting storage.values=extended -- nothing is banned.
-#storage.values.list =
+storage.values.list = temperature,humidity,pressure,batteryVoltage,txPower,rssi
 
 #
 # Advanced configuration - Change these only if you know what you are doing
