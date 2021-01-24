@@ -390,6 +390,10 @@ public abstract class Config {
             .orElse(influxDbFieldFilter);
     }
 
+    public static Set<String> getStorageValueSet() {
+        return FILTER_INFLUXDB_FIELDS;
+    }
+
     public static String getInfluxUrl() {
         return influxUrl;
     }

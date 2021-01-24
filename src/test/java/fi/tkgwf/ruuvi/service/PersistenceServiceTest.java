@@ -7,6 +7,7 @@ import fi.tkgwf.ruuvi.config.Config;
 import fi.tkgwf.ruuvi.config.ConfigTest;
 import fi.tkgwf.ruuvi.db.DBConnection;
 import fi.tkgwf.ruuvi.handler.BeaconHandler;
+import fi.tkgwf.ruuvi.service.impl.DatabasePersistenceServiceImpl;
 import fi.tkgwf.ruuvi.strategy.LimitingStrategy;
 import fi.tkgwf.ruuvi.utils.HCIParser;
 import java.util.ArrayList;
@@ -39,7 +40,7 @@ class PersistenceServiceTest {
         final BeaconHandler handler = new BeaconHandler();
         final MockConnection mockConnection = new MockConnection();
         final LimitingStrategy testingStrategy = new TestingStrategy();
-        final PersistenceService service = new PersistenceService(mockConnection, testingStrategy);
+        final PersistenceService service = new DatabasePersistenceServiceImpl(mockConnection, testingStrategy);
 
         service.store(withRssi(handler.handle(hciData).get(), 1));
         service.store(withRssi(handler.handle(hciData).get(), 2));
@@ -71,7 +72,7 @@ class PersistenceServiceTest {
 
         final MockConnection mockConnection = new MockConnection();
         final LimitingStrategy testingStrategy = new TestingStrategy();
-        final PersistenceService service = new PersistenceService(mockConnection, testingStrategy);
+        final PersistenceService service = new DatabasePersistenceServiceImpl(mockConnection, testingStrategy);
 
         final HCIData hciData = new HCIParser().readLine(TestFixture.getDataFormat3Message());
         hciData.mac = "ABCDEF012345";

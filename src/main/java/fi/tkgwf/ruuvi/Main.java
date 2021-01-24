@@ -4,6 +4,7 @@ import fi.tkgwf.ruuvi.service.PersistenceService;
 import fi.tkgwf.ruuvi.bean.HCIData;
 import fi.tkgwf.ruuvi.config.Config;
 import fi.tkgwf.ruuvi.handler.BeaconHandler;
+import fi.tkgwf.ruuvi.service.PersistenceServiceFactory;
 import fi.tkgwf.ruuvi.utils.HCIParser;
 import fi.tkgwf.ruuvi.utils.InfluxDataMigrator;
 import fi.tkgwf.ruuvi.utils.MeasurementValueCalculator;
@@ -34,7 +35,7 @@ public class Main {
         }
         LOG.info("Clean exit");
         System.exit(0); // due to a bug in the InfluxDB library, we have to force the exit as a
-                        // workaround. See: https://github.com/influxdata/influxdb-java/issues/359
+        // workaround. See: https://github.com/influxdata/influxdb-java/issues/359
     }
 
     private BufferedReader startHciListeners() throws IOException {
@@ -58,6 +59,7 @@ public class Main {
      * @return true if the run ends gracefully, false in case of severe errors
      */
     public boolean run() {
+        LOG.info("RUN()");
         BufferedReader reader;
         try {
             reader = startHciListeners();
@@ -71,12 +73,16 @@ public class Main {
     }
 
     boolean run(final BufferedReader reader) {
+        LOG.info("run(final BufferedReader reader)");
         HCIParser parser = new HCIParser();
         boolean dataReceived = false;
         boolean healthy = false;
-        try (final PersistenceService persistenceService = new PersistenceService()) {
+
+        try (final PersistenceService persistenceService = PersistenceServiceFactory.createPersistenceService()) {
             String line, latestMAC = null;
+            LOG.info(" Inside - try (final PersistenceService persistenceService = new PersistenceService()) {" );
             while ((line = reader.readLine()) != null) {
+                LOG.info(line);
                 if (line.contains("device: disconnected")) {
                     LOG.error(line + ": Either the bluetooth device was externally disabled or physically disconnected");
                     healthy = false;
@@ -117,10 +123,11 @@ public class Main {
                     LOG.debug("Offending line: " + line);
                 }
             }
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             LOG.error("Uncaught exception while reading measurements", ex);
             return false;
         }
+        LOG.info("run() <end> healthy: " + healthy );
         return healthy;
     }
 }
