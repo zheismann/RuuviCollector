@@ -82,7 +82,6 @@ public class Main {
             String line, latestMAC = null;
             LOG.info(" Inside - try (final PersistenceService persistenceService = new PersistenceService()) {" );
             while ((line = reader.readLine()) != null) {
-                LOG.info(line);
                 if (line.contains("device: disconnected")) {
                     LOG.error(line + ": Either the bluetooth device was externally disabled or physically disconnected");
                     healthy = false;
