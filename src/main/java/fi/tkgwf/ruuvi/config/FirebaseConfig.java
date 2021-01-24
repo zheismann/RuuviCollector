@@ -18,7 +18,7 @@ import java.util.function.Function;
 public abstract class FirebaseConfig {
 
     private static final Logger LOG = Logger.getLogger(FirebaseConfig.class);
-    private static final String FIREBASE_PROPERTIES = "firebase.properties";
+    private static final String FIREBASE_PROPERTIES = "ruuvi-firebase.properties";
 
     private static String firebaseProjectId;
     private static String firebaseCollectionName;

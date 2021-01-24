@@ -1,0 +1,3 @@
+firebaseProjectId=mikinipai
+firebaseCollectionName=measurement
+firebaseServiceAccountJSONPrivateKey=/c/dev/workspaces/temperature-sensor/firebase-helloworld-writer/src/main/resources/helloworld-17c82-9406e5f0afd3.json

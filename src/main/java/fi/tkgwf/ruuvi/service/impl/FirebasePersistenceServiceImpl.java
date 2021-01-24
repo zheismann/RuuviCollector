@@ -12,7 +12,6 @@ import com.google.firebase.FirebaseOptions;
 import com.google.firebase.cloud.FirestoreClient;
 
 import fi.tkgwf.ruuvi.bean.EnhancedRuuviMeasurement;
-import fi.tkgwf.ruuvi.config.Config;
 import fi.tkgwf.ruuvi.config.FirebaseConfig;
 import fi.tkgwf.ruuvi.service.PersistenceService;
 import org.apache.log4j.Logger;
@@ -20,24 +19,35 @@ import org.apache.log4j.Logger;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-public class FirebasePersistenceServiceImpl implements PersistenceService {
-    private static final Logger LOG = Logger.getLogger( FirebasePersistenceServiceImpl.class);
+public class FirebasePersistenceServiceImpl implements PersistenceService
+{
+    private static final Logger LOG = Logger.getLogger( FirebasePersistenceServiceImpl.class );
 
     private Firestore db;
     private CollectionReference collection;
 
-    public FirebasePersistenceServiceImpl() {
-        this(FirebaseConfig.getFirebaseProjectId(), FirebaseConfig.getFirebaseServiceAccountJSONPrivateKey(), FirebaseConfig.getFirebaseCollectionName());
+    private final ArrayBlockingQueue<EnhancedRuuviMeasurement> arrayBlockingQueue =
+        new ArrayBlockingQueue<>( Integer.MAX_VALUE / 2, true );
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool( 1 );
+
+    public FirebasePersistenceServiceImpl()
+    {
+        this( FirebaseConfig.getFirebaseProjectId(), FirebaseConfig.getFirebaseServiceAccountJSONPrivateKey(), FirebaseConfig.getFirebaseCollectionName() );
     }
 
-    protected FirebasePersistenceServiceImpl( String firebaseProjectId, Path serviceAccountJSONPrivateKey, String firebaseCollectionName ) {
-        try ( InputStream serviceAccount = new FileInputStream(serviceAccountJSONPrivateKey.toFile() ) ) {
+    protected FirebasePersistenceServiceImpl( String firebaseProjectId, Path serviceAccountJSONPrivateKey, String firebaseCollectionName )
+    {
+        try ( InputStream serviceAccount = new FileInputStream( serviceAccountJSONPrivateKey.toFile() ) )
+        {
             GoogleCredentials credentials = GoogleCredentials.fromStream( serviceAccount );
             FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials( credentials )
@@ -47,6 +57,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService {
 
             db = FirestoreClient.getFirestore();
             collection = db.collection( firebaseCollectionName );
+            scheduler.scheduleWithFixedDelay( new FirebaseWriter(), 1, 1, TimeUnit.MINUTES );
         }
         catch ( Exception e )
         {
@@ -55,17 +66,21 @@ public class FirebasePersistenceServiceImpl implements PersistenceService {
     }
 
     @Override
-    public void close() {
-        try {
+    public void close()
+    {
+        try
+        {
             db.close();
         }
-        catch ( Exception exc ) {
+        catch ( Exception exc )
+        {
             LOG.warn( "Failure occurred while closing connection to Firestore database" );
         }
     }
 
     @Override
-    public void store(final EnhancedRuuviMeasurement measurement) {
+    public void store( final EnhancedRuuviMeasurement measurement )
+    {
 /*
         TODO: use limitingStrategy?  or does that only make sense for InfluxDB?
         Optional.ofNullable(measurement.getMac())
@@ -74,41 +89,80 @@ public class FirebasePersistenceServiceImpl implements PersistenceService {
             .apply(measurement)
             .ifPresent(db::save);
 */
-
-        // batches and transactions: https://firebase.google.com/docs/firestore/manage-data/transactions
-        WriteBatch batch = db.batch();
-
-        final DocumentReference ruuviMeasurementDocument = collection.document();
-
-        // TODO: only record properties as defined in Config.getStorageValueSet()
-        Map<String, Object> data = new HashMap<>();
-        data.put( "mac", measurement.getMac() );
-        data.put( "time", measurement.getTime() );
-        data.put( "rssi", measurement.getRssi() );
-        data.put( "temperature", measurement.getTemperature() );
-        data.put( "txPower", measurement.getTxPower() );
-        data.put( "batteryVoltage", measurement.getBatteryVoltage() );
-        data.put( "pressure", measurement.getPressure() );
-        data.put( "humidity", measurement.getHumidity() );
-
-
-        // TODO: store these measurements in a queue that will be read by another thread that will
-        //  create actual batches
-        batch.create( ruuviMeasurementDocument, data );
-
-        // asynchronously commit the batch
-        ApiFuture<List<WriteResult>> future = batch.commit();
-
-        // future.get() blocks on batch commit operation
-        try
+        boolean measurementAdded = arrayBlockingQueue.offer( measurement );
+        if ( !measurementAdded )
         {
-            for (WriteResult result : future.get()) {
-                System.out.println( "Update time : " + result.getUpdateTime() );
-            }
+            LOG.error( "Failed to add measurement: " + measurement );
         }
-        catch ( Exception e ) {
-            LOG.error( "Failed writing to Firebase message: " + e.getMessage(), e );
-        }
+
     }
 
+    private class FirebaseWriter implements Runnable
+    {
+        private final List<ApiFuture<List<WriteResult>>> futures = new ArrayList<>();
+
+        @Override
+        public void run()
+        {
+            LOG.info( "FirebaseWriter.run()  futures " + futures.size() + "\tarrayBlockingQueue " + arrayBlockingQueue.size() );
+            List<ApiFuture<List<WriteResult>>> completedFutures = new ArrayList<>();
+            for ( ApiFuture<List<WriteResult>> future : futures )
+            {
+                try
+                {
+                    future.get();
+                    completedFutures.add( future );
+                }
+                catch ( Throwable t )
+                {
+                    LOG.error( "Encountered error while waiting on an ApiFuture to complete. " + t.getMessage(), t );
+                }
+            }
+            futures.removeAll( completedFutures );
+            completedFutures.clear();
+            if ( !futures.isEmpty() )
+            {
+                LOG.info( "futures is not empty! futures.size(): " + futures.size() );
+            }
+
+            try
+            {
+                // batches and transactions: https://firebase.google.com/docs/firestore/manage-data/transactions
+                WriteBatch batch = db.batch();
+
+                final int MAXIMUM_MEASUREMENTS_TO_WRITE = 500; // per the API
+                List<EnhancedRuuviMeasurement> measurementsToWrite = new ArrayList<>();
+                arrayBlockingQueue.drainTo( measurementsToWrite, MAXIMUM_MEASUREMENTS_TO_WRITE );
+
+                for ( EnhancedRuuviMeasurement measurement : measurementsToWrite )
+                {
+                    final DocumentReference ruuviMeasurementDocument = collection.document();
+                    // TODO: only record properties as defined in Config.getStorageValueSet()
+                    Map<String, Object> data = new HashMap<>();
+                    data.put( "mac", measurement.getMac() );
+                    data.put( "time", measurement.getTime() );
+                    data.put( "rssi", measurement.getRssi() );
+                    data.put( "temperature", measurement.getTemperature() );
+                    data.put( "txPower", measurement.getTxPower() );
+                    data.put( "batteryVoltage", measurement.getBatteryVoltage() );
+                    data.put( "pressure", measurement.getPressure() );
+                    data.put( "humidity", measurement.getHumidity() );
+
+
+                    // TODO: store these measurements in a queue that will be read by another thread that will
+                    //  create actual batches
+                    batch.create( ruuviMeasurementDocument, data );
+                }
+                measurementsToWrite.clear();
+
+                // asynchronously commit the batch
+                ApiFuture<List<WriteResult>> future = batch.commit();
+                futures.add( future );
+            }
+            catch ( Throwable t )
+            {
+                LOG.error( "Encountered error in FirebaseWriter. " + t.getMessage(), t );
+            }
+        }
+    }
 }
