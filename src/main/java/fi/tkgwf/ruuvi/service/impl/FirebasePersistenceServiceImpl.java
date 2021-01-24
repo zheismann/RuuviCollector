@@ -36,7 +36,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
     private CollectionReference collection;
 
     private final ArrayBlockingQueue<EnhancedRuuviMeasurement> arrayBlockingQueue =
-        new ArrayBlockingQueue<>( Integer.MAX_VALUE / 2, true );
+        new ArrayBlockingQueue<>( 250000, true );
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool( 1 );
 
     public FirebasePersistenceServiceImpl()
