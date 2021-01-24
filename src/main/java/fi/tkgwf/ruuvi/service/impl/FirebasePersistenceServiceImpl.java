@@ -133,7 +133,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 final int MAXIMUM_MEASUREMENTS_TO_WRITE = 500; // per the API
                 List<EnhancedRuuviMeasurement> measurementsToWrite = new ArrayList<>();
                 arrayBlockingQueue.drainTo( measurementsToWrite, MAXIMUM_MEASUREMENTS_TO_WRITE );
-
+                LOG.info("measurementsToWrite.size(): " + measurementsToWrite.size() );
                 for ( EnhancedRuuviMeasurement measurement : measurementsToWrite )
                 {
                     final DocumentReference ruuviMeasurementDocument = collection.document();
