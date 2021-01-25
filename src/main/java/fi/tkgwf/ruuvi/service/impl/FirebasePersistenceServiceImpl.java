@@ -21,8 +21,10 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -134,6 +136,8 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 List<EnhancedRuuviMeasurement> measurementsToWrite = new ArrayList<>();
                 arrayBlockingQueue.drainTo( measurementsToWrite, MAXIMUM_MEASUREMENTS_TO_WRITE );
                 LOG.info("measurementsToWrite.size(): " + measurementsToWrite.size() );
+
+                Set<String> macAddresses = new HashSet<>();
                 for ( EnhancedRuuviMeasurement measurement : measurementsToWrite )
                 {
                     final DocumentReference ruuviMeasurementDocument = collection.document();
@@ -148,17 +152,17 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     data.put( "pressure", measurement.getPressure() );
                     data.put( "humidity", measurement.getHumidity() );
 
+                    macAddresses.add( measurement.getMac() );
 
                     // TODO: store these measurements in a queue that will be read by another thread that will
                     //  create actual batches
                     batch.create( ruuviMeasurementDocument, data );
                 }
-                LOG.info("finished creating ruuviMeasurementDocument" );
+                LOG.info("finished creating ruuviMeasurementDocument for these mac addresses: " + macAddresses );
                 measurementsToWrite.clear();
 
                 // asynchronously commit the batch
                 ApiFuture<List<WriteResult>> future = batch.commit();
-                LOG.info("after batch.commit" );
                 futures.add( future );
             }
             catch ( Throwable t )
