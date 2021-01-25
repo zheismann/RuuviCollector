@@ -6,6 +6,8 @@ import fi.tkgwf.ruuvi.common.bean.RuuviMeasurement;
 import fi.tkgwf.ruuvi.common.parser.DataFormatParser;
 import fi.tkgwf.ruuvi.common.parser.impl.AnyDataFormatParser;
 import fi.tkgwf.ruuvi.config.Config;
+
+import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -38,6 +40,7 @@ public class BeaconHandler {
         EnhancedRuuviMeasurement enhancedMeasurement = new EnhancedRuuviMeasurement(measurement);
         enhancedMeasurement.setMac(hciData.mac);
         enhancedMeasurement.setRssi(hciData.rssi);
+        enhancedMeasurement.setTime( Instant.now().toEpochMilli() );
         enhancedMeasurement.setName(Config.getTagName(hciData.mac));
         return Optional.of(enhancedMeasurement);
     }

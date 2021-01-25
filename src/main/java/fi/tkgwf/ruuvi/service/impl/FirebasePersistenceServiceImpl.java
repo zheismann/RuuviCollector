@@ -153,10 +153,12 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     //  create actual batches
                     batch.create( ruuviMeasurementDocument, data );
                 }
+                LOG.info("finished creating ruuviMeasurementDocument" );
                 measurementsToWrite.clear();
 
                 // asynchronously commit the batch
                 ApiFuture<List<WriteResult>> future = batch.commit();
+                LOG.info("after batch.commit" );
                 futures.add( future );
             }
             catch ( Throwable t )
