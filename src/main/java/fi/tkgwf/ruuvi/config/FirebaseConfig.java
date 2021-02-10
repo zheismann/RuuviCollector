@@ -58,9 +58,13 @@ public abstract class FirebaseConfig {
 
     public static void readConfigFromProperties(final Properties props) {
         firebaseProjectId = props.getProperty("firebaseProjectId");
+        LOG.debug( "firebaseProjectId = " + firebaseProjectId );
         firebaseCollectionName = props.getProperty("firebaseCollectionName");
+        LOG.debug( "firebaseCollectionName = " + firebaseCollectionName );
         final File privateKeyFile = configFileFinder.apply( props.getProperty("firebaseServiceAccountJSONPrivateKey") );
+        LOG.debug( "privateKeyFile = " + privateKeyFile );
         firebaseServiceAccountJSONPrivateKey = privateKeyFile == null ? null : privateKeyFile.toPath();
+        LOG.debug( "firebaseServiceAccountJSONPrivateKey = " + firebaseServiceAccountJSONPrivateKey );
         validateConfig();
     }
 
