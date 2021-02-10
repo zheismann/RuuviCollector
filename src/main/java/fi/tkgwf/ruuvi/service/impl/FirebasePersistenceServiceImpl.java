@@ -101,6 +101,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
 
     private class FirebaseWriter implements Runnable
     {
+        final Map<String, EnhancedRuuviMeasurement> recordedMeasurementsMap = new HashMap<>();
         private final List<ApiFuture<List<WriteResult>>> futures = new ArrayList<>();
 
         @Override
@@ -140,6 +141,11 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 Set<String> macAddresses = new HashSet<>();
                 for ( EnhancedRuuviMeasurement measurement : measurementsToWrite )
                 {
+                    if ( !shouldBeRecorded( measurement ) )
+                    {
+                        continue;
+                    }
+
                     final DocumentReference ruuviMeasurementDocument = collection.document();
                     // TODO: only record properties as defined in Config.getStorageValueSet()
                     Map<String, Object> data = new HashMap<>();
@@ -157,6 +163,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     // TODO: store these measurements in a queue that will be read by another thread that will
                     //  create actual batches
                     batch.create( ruuviMeasurementDocument, data );
+                    recordedMeasurementsMap.put( measurement.getMac(), measurement );
                 }
                 LOG.info("finished creating ruuviMeasurementDocument for these mac addresses: " + macAddresses );
                 measurementsToWrite.clear();
@@ -169,6 +176,23 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
             {
                 LOG.error( "Encountered error in FirebaseWriter. " + t.getMessage(), t );
             }
+        }
+
+        private boolean shouldBeRecorded( EnhancedRuuviMeasurement t )
+        {
+            boolean shouldBeRecorded = true;
+            String currentMAC = t.getMac();
+            Long currentMeasurementTime = t.getTime();
+            if ( recordedMeasurementsMap.containsKey( currentMAC ) )
+            {
+                Long previousMeasurementTime = recordedMeasurementsMap.get( currentMAC ).getTime();
+                final int ONE_MINUTE_IN_MILLISECONDS = 1000 * 60;
+                if ( ( currentMeasurementTime - previousMeasurementTime ) < ONE_MINUTE_IN_MILLISECONDS )
+                {
+                    shouldBeRecorded = false;
+                }
+            }
+            return shouldBeRecorded;
         }
     }
 }
