@@ -48,6 +48,7 @@ public abstract class FirebaseConfig {
                 LOG.debug("FirebaseConfig: " + configFile);
                 Properties props = new Properties();
                 props.load(new InputStreamReader(new FileInputStream(configFile), Charset.forName("UTF-8")));
+                LOG.debug("props: " + props);
                 readConfigFromProperties(props);
             }
         } catch ( IOException ex) {
