@@ -1,6 +1,6 @@
 package fi.tkgwf.ruuvi.service;
 
-import fi.tkgwf.ruuvi.service.impl.DatabasePersistenceServiceImpl;
+import fi.tkgwf.ruuvi.service.impl.FirebasePersistenceServiceImpl;
 
 public final class PersistenceServiceFactory {
     private PersistenceServiceFactory() {
@@ -12,6 +12,6 @@ public final class PersistenceServiceFactory {
      * @return new instance of a PersistenceService
      */
     public static PersistenceService createPersistenceService() {
-        return new DatabasePersistenceServiceImpl();
+        return new FirebasePersistenceServiceImpl();
     }
 }
