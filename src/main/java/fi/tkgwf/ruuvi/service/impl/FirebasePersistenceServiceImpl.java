@@ -134,12 +134,12 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 WriteBatch batch = db.batch();
 
                 final int MAXIMUM_MEASUREMENTS_TO_WRITE = 500; // per the API
-                List<EnhancedRuuviMeasurement> measurementsToWrite = new ArrayList<>();
-                arrayBlockingQueue.drainTo( measurementsToWrite, MAXIMUM_MEASUREMENTS_TO_WRITE );
-                LOG.info("measurementsToWrite.size(): " + measurementsToWrite.size() );
+                List<EnhancedRuuviMeasurement> measurementsRecorded = new ArrayList<>();
+                arrayBlockingQueue.drainTo( measurementsRecorded, MAXIMUM_MEASUREMENTS_TO_WRITE );
+                LOG.info("measurementsRecorded.size(): " + measurementsRecorded.size() );
 
                 Set<String> macAddresses = new HashSet<>();
-                for ( EnhancedRuuviMeasurement measurement : measurementsToWrite )
+                for ( EnhancedRuuviMeasurement measurement : measurementsRecorded )
                 {
                     if ( !shouldBeRecorded( measurement ) )
                     {
@@ -166,7 +166,8 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     recordedMeasurementsMap.put( measurement.getMac(), measurement );
                 }
                 LOG.info("finished creating ruuviMeasurementDocument for these mac addresses: " + macAddresses );
-                measurementsToWrite.clear();
+                measurementsRecorded.clear();
+                LOG.info("Number of measurements to write via batch: " + batch.getMutationsSize() );
 
                 // asynchronously commit the batch
                 ApiFuture<List<WriteResult>> future = batch.commit();
