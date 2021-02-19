@@ -1,4 +1,4 @@
 firebaseProjectId=mikinipai
 firebaseMeasurementHistoryCollectionName=measurement
 firebaseMostRecentMeasurementCollectionName=most_recent_measurements
-firebaseServiceAccountJSONPrivateKey=/c/dev/workspaces/temperature-sensor/firebase-helloworld-writer/src/main/resources/helloworld-17c82-9406e5f0afd3.json
+firebaseServiceAccountJSONPrivateKey=/home/pi/Documents/RuuviCollector/mikinipai-firebase.json
