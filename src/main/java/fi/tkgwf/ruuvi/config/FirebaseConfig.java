@@ -63,6 +63,7 @@ public abstract class FirebaseConfig {
         LOG.debug( "firebaseMeasurementHistoryCollectionName = " + firebaseMeasurementHistoryCollectionName );
         firebaseMostRecentMeasurementCollectionName = props.getProperty("firebaseMostRecentMeasurementCollectionName");
         LOG.debug( "firebaseMostRecentMeasurementCollectionName = " + firebaseMostRecentMeasurementCollectionName );
+        LOG.debug( "props.getProperty(\"firebaseServiceAccountJSONPrivateKey\") = " + props.getProperty("firebaseServiceAccountJSONPrivateKey") );
         final File privateKeyFile = configFileFinder.apply( props.getProperty("firebaseServiceAccountJSONPrivateKey") );
         LOG.debug( "privateKeyFile = " + privateKeyFile );
         firebaseServiceAccountJSONPrivateKey = privateKeyFile == null ? null : privateKeyFile.toPath();
