@@ -1,4 +1,4 @@
 firebaseProjectId=mikinipai
 firebaseMeasurementHistoryCollectionName=measurement
 firebaseMostRecentMeasurementCollectionName=most_recent_measurements
-firebaseServiceAccountJSONPrivateKey=/home/pi/Documents/RuuviCollector/mikinipai-firebase.json
+firebaseServiceAccountJSONPrivateKey=mikinipai-firebase.json
