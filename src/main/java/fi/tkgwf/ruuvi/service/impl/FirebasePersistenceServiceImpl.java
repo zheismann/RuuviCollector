@@ -35,7 +35,8 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
     private static final Logger LOG = Logger.getLogger( FirebasePersistenceServiceImpl.class );
 
     private Firestore db;
-    private CollectionReference collection;
+    private CollectionReference firebaseMeasurementHistoryCollection;
+    private CollectionReference firebaseMostRecentMeasurementCollection;
 
     private final ArrayBlockingQueue<EnhancedRuuviMeasurement> arrayBlockingQueue =
         new ArrayBlockingQueue<>( 250000, true );
@@ -43,10 +44,10 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
 
     public FirebasePersistenceServiceImpl()
     {
-        this( FirebaseConfig.getFirebaseProjectId(), FirebaseConfig.getFirebaseServiceAccountJSONPrivateKey(), FirebaseConfig.getFirebaseCollectionName() );
+        this( FirebaseConfig.getFirebaseProjectId(), FirebaseConfig.getFirebaseServiceAccountJSONPrivateKey(), FirebaseConfig.getFirebaseMeasurementHistoryCollectionName(), FirebaseConfig.getFirebaseMostRecentMeasurementCollectionName() );
     }
 
-    protected FirebasePersistenceServiceImpl( String firebaseProjectId, Path serviceAccountJSONPrivateKey, String firebaseCollectionName )
+    protected FirebasePersistenceServiceImpl( String firebaseProjectId, Path serviceAccountJSONPrivateKey, String firebaseMeasurementHistoryCollectionName, String firebaseMostRecentMeasurementCollectionName )
     {
         try ( InputStream serviceAccount = new FileInputStream( serviceAccountJSONPrivateKey.toFile() ) )
         {
@@ -58,7 +59,8 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
             FirebaseApp.initializeApp( options );
 
             db = FirestoreClient.getFirestore();
-            collection = db.collection( firebaseCollectionName );
+            firebaseMeasurementHistoryCollection = db.collection( firebaseMeasurementHistoryCollectionName );
+            firebaseMostRecentMeasurementCollection = db.collection( firebaseMostRecentMeasurementCollectionName );
             scheduler.scheduleWithFixedDelay( new FirebaseWriter(), 1, 1, TimeUnit.MINUTES );
         }
         catch ( Exception e )
@@ -102,31 +104,13 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
     private class FirebaseWriter implements Runnable
     {
         final Map<String, EnhancedRuuviMeasurement> recordedMeasurementsMap = new HashMap<>();
-        private final List<ApiFuture<List<WriteResult>>> futures = new ArrayList<>();
+        private final List<ApiFuture<List<WriteResult>>> batchFutures = new ArrayList<>();
+        private final List<ApiFuture<WriteResult>> futures = new ArrayList<>();
 
         @Override
         public void run()
         {
-            LOG.info( "FirebaseWriter.run()  futures " + futures.size() + "\tarrayBlockingQueue " + arrayBlockingQueue.size() );
-            List<ApiFuture<List<WriteResult>>> completedFutures = new ArrayList<>();
-            for ( ApiFuture<List<WriteResult>> future : futures )
-            {
-                try
-                {
-                    future.get();
-                    completedFutures.add( future );
-                }
-                catch ( Throwable t )
-                {
-                    LOG.error( "Encountered error while waiting on an ApiFuture to complete. " + t.getMessage(), t );
-                }
-            }
-            futures.removeAll( completedFutures );
-            completedFutures.clear();
-            if ( !futures.isEmpty() )
-            {
-                LOG.info( "futures is not empty! futures.size(): " + futures.size() );
-            }
+            waitForPreviousWriteEventsToFinish();
 
             try
             {
@@ -145,8 +129,14 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     {
                         continue;
                     }
+                    final DocumentReference mostRecentMeasurementDocument = firebaseMostRecentMeasurementCollection.document( measurement.getMac() );
+                    Map<String, Object> mostRecentMeasurementData = new HashMap<>();
+                    mostRecentMeasurementData.put( "time", new java.util.Date() );
+                    mostRecentMeasurementData.put( "temperature", measurement.getTemperature() );
+                    ApiFuture<WriteResult> future = mostRecentMeasurementDocument.update( mostRecentMeasurementData );
+                    futures.add( future );
 
-                    final DocumentReference ruuviMeasurementDocument = collection.document();
+                    final DocumentReference ruuviMeasurementDocument = firebaseMeasurementHistoryCollection.document();
                     // TODO: only record properties as defined in Config.getStorageValueSet()
                     Map<String, Object> data = new HashMap<>();
                     data.put( "mac", measurement.getMac() );
@@ -170,12 +160,57 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 LOG.info("Number of measurements to write via batch: " + batch.getMutationsSize() );
 
                 // asynchronously commit the batch
-                ApiFuture<List<WriteResult>> future = batch.commit();
-                futures.add( future );
+                ApiFuture<List<WriteResult>> batchFutures = batch.commit();
+                this.batchFutures.add( batchFutures );
             }
             catch ( Throwable t )
             {
                 LOG.error( "Encountered error in FirebaseWriter. " + t.getMessage(), t );
+            }
+        }
+
+        private void waitForPreviousWriteEventsToFinish()
+        {
+            LOG.info( "FirebaseWriter.run()  batchFutures " + batchFutures.size() + "\tarrayBlockingQueue " + arrayBlockingQueue.size() );
+            List<ApiFuture<List<WriteResult>>> completedBatchFutures = new ArrayList<>();
+            for ( ApiFuture<List<WriteResult>> future : batchFutures )
+            {
+                try
+                {
+                    future.get();
+                    completedBatchFutures.add( future );
+                }
+                catch ( Throwable t )
+                {
+                    LOG.error( "Encountered error while waiting on an ApiFuture to complete. " + t.getMessage(), t );
+                }
+            }
+            batchFutures.removeAll( completedBatchFutures );
+            completedBatchFutures.clear();
+            if ( !batchFutures.isEmpty() )
+            {
+                LOG.info( "batchFutures is not empty! futures.size(): " + batchFutures.size() );
+            }
+
+            LOG.info( "FirebaseWriter.run()  futures " + futures.size() );
+            List<ApiFuture<WriteResult>> completedFutures = new ArrayList<>();
+            for ( ApiFuture<WriteResult> future : futures )
+            {
+                try
+                {
+                    future.get();
+                    completedFutures.add( future );
+                }
+                catch ( Throwable t )
+                {
+                    LOG.error( "Encountered error while waiting on an ApiFuture to complete. " + t.getMessage(), t );
+                }
+            }
+            futures.removeAll( completedFutures );
+            completedFutures.clear();
+            if ( !futures.isEmpty() )
+            {
+                LOG.info( "futures is not empty! futures.size(): " + futures.size() );
             }
         }
 
