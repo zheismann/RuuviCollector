@@ -4,6 +4,7 @@ import com.google.api.core.ApiFuture;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.DocumentReference;
+import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.WriteBatch;
 import com.google.cloud.firestore.WriteResult;
@@ -19,6 +20,8 @@ import org.apache.log4j.Logger;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,8 +38,10 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
     private static final Logger LOG = Logger.getLogger( FirebasePersistenceServiceImpl.class );
 
     private Firestore db;
-    private CollectionReference firebaseMeasurementHistoryCollection;
-    private CollectionReference firebaseMostRecentMeasurementCollection;
+    private CollectionReference measurementHistoryCollection;
+    private CollectionReference mostRecentMeasurementCollection;
+    private CollectionReference dailyTemperatureRangesCollection;
+    private CollectionReference recentSensorReadingsCollection;
 
     private final ArrayBlockingQueue<EnhancedRuuviMeasurement> arrayBlockingQueue =
         new ArrayBlockingQueue<>( 250000, true );
@@ -44,28 +49,30 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
 
     public FirebasePersistenceServiceImpl()
     {
-        this( FirebaseConfig.getFirebaseProjectId(), FirebaseConfig.getFirebaseServiceAccountJSONPrivateKey(), FirebaseConfig.getFirebaseMeasurementHistoryCollectionName(), FirebaseConfig.getFirebaseMostRecentMeasurementCollectionName() );
+        this( FirebaseConfig.getProjectId(), FirebaseConfig.getServiceAccountJSONPrivateKey() );
     }
 
-    protected FirebasePersistenceServiceImpl( String firebaseProjectId, Path serviceAccountJSONPrivateKey, String firebaseMeasurementHistoryCollectionName, String firebaseMostRecentMeasurementCollectionName )
+    protected FirebasePersistenceServiceImpl( String projectId, Path serviceAccountJSONPrivateKey )
     {
         try ( InputStream serviceAccount = new FileInputStream( serviceAccountJSONPrivateKey.toFile() ) )
         {
             GoogleCredentials credentials = GoogleCredentials.fromStream( serviceAccount );
             FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials( credentials )
-                .setProjectId( firebaseProjectId )
+                .setProjectId( projectId )
                 .build();
             FirebaseApp.initializeApp( options );
 
             db = FirestoreClient.getFirestore();
-            firebaseMeasurementHistoryCollection = db.collection( firebaseMeasurementHistoryCollectionName );
-            firebaseMostRecentMeasurementCollection = db.collection( firebaseMostRecentMeasurementCollectionName );
+            measurementHistoryCollection = db.collection( FirebaseConfig.getMeasurementHistoryCollectionName() );
+            mostRecentMeasurementCollection = db.collection( FirebaseConfig.getMostRecentMeasurementCollectionName() );
+            dailyTemperatureRangesCollection = db.collection( "daily_temperature_ranges" );
+            recentSensorReadingsCollection = db.collection( "recent_sensor_readings" );
             scheduler.scheduleWithFixedDelay( new FirebaseWriter(), 1, 1, TimeUnit.MINUTES );
         }
         catch ( Exception e )
         {
-            throw new RuntimeException( "Failure creating connection to Firebase projectId: " + firebaseProjectId + " using key: " + serviceAccountJSONPrivateKey, e );
+            throw new RuntimeException( "Failure creating connection to Firebase projectId: " + projectId + " using key: " + serviceAccountJSONPrivateKey, e );
         }
     }
 
@@ -129,15 +136,64 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     {
                         continue;
                     }
-                    final DocumentReference mostRecentMeasurementDocument = firebaseMostRecentMeasurementCollection.document( measurement.getMac() );
-                    Map<String, Object> mostRecentMeasurementData = new HashMap<>();
-                    mostRecentMeasurementData.put( "time", new java.util.Date() );
-                    mostRecentMeasurementData.put( "temperature", measurement.getTemperature() );
-                    ApiFuture<WriteResult> future = mostRecentMeasurementDocument.update( mostRecentMeasurementData );
+                    final DocumentReference mostRecentMeasurementDocument = mostRecentMeasurementCollection.document( measurement.getMac() );
+                    Map<String, Object> sensorData = new HashMap<>();
+                    sensorData.put( "time", new java.util.Date() );
+                    sensorData.put( "temperature", measurement.getTemperature() );
+                    ApiFuture<WriteResult> future = mostRecentMeasurementDocument.update( sensorData );
                     futures.add( future );
 
-                    final DocumentReference ruuviMeasurementDocument = firebaseMeasurementHistoryCollection.document();
-                    // TODO: only record properties as defined in Config.getStorageValueSet()
+                    final DocumentReference recentSensorReadingDocRef = recentSensorReadingsCollection.document( measurement.getMac() );
+                    final CollectionReference minMaxCollRef = recentSensorReadingDocRef.collection( "min_max" );
+                    final DocumentReference todayMinMaxDocRef = minMaxCollRef.document( LocalDate.now().format( DateTimeFormatter.BASIC_ISO_DATE ) );
+                    sensorData = new HashMap<>();
+                    sensorData.put( "last_sensor_reading_timestamp", new java.util.Date() );
+                    sensorData.put( "last_temperature_reading", measurement.getTemperature() );
+                    final HashMap<String, Object> minMaxData = new HashMap<>();
+
+                    final ApiFuture<DocumentSnapshot> documentSnapshotApiFuture = recentSensorReadingDocRef.get();
+                    final DocumentSnapshot documentSnapshot = documentSnapshotApiFuture.get();
+                    if ( !documentSnapshot.exists() )
+                    {
+                        batch.create( recentSensorReadingDocRef, sensorData );
+                        minMaxData.put( "max_temperature", measurement.getTemperature() );
+                        minMaxData.put( "max_temperature_timestamp", new java.util.Date() );
+                        minMaxData.put( "min_temperature", measurement.getTemperature() );
+                        minMaxData.put( "min_temperature_timestamp", new java.util.Date() );
+                        batch.create( todayMinMaxDocRef, minMaxData );
+                    }
+                    else
+                    {
+                        batch.update( recentSensorReadingDocRef, sensorData );
+                        final DocumentSnapshot minMaxDocSnapshot = todayMinMaxDocRef.get().get();
+                        if ( !minMaxDocSnapshot.exists() )
+                        {
+                            minMaxData.put( "max_temperature", measurement.getTemperature() );
+                            minMaxData.put( "max_temperature_timestamp", new java.util.Date() );
+                            minMaxData.put( "min_temperature", measurement.getTemperature() );
+                            minMaxData.put( "min_temperature_timestamp", new java.util.Date() );
+                            batch.create( todayMinMaxDocRef, minMaxData );
+                        }
+                        else
+                        {
+                            final double currentMaxTemperature = ( Double ) minMaxDocSnapshot.get( "max_temperature" );
+                            if ( measurement.getTemperature() >= currentMaxTemperature )
+                            {
+                                minMaxData.put( "max_temperature", measurement.getTemperature() );
+                                minMaxData.put( "max_temperature_timestamp", new java.util.Date() );
+                            }
+                            final double currentMinTemperature = ( Double ) minMaxDocSnapshot.get( "min_temperature" );
+                            if ( measurement.getTemperature() <= currentMinTemperature )
+                            {
+                                minMaxData.put( "min_temperature", measurement.getTemperature() );
+                                minMaxData.put( "min_temperature_timestamp", new java.util.Date() );
+                            }
+                            batch.update( todayMinMaxDocRef, minMaxData );
+                        }
+                    }
+
+
+                    final DocumentReference ruuviMeasurementDocument = measurementHistoryCollection.document();
                     Map<String, Object> data = new HashMap<>();
                     data.put( "mac", measurement.getMac() );
                     data.put( "time", measurement.getTime() );
@@ -150,8 +206,6 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
 
                     macAddresses.add( measurement.getMac() );
 
-                    // TODO: store these measurements in a queue that will be read by another thread that will
-                    //  create actual batches
                     batch.create( ruuviMeasurementDocument, data );
                     recordedMeasurementsMap.put( measurement.getMac(), measurement );
                 }
