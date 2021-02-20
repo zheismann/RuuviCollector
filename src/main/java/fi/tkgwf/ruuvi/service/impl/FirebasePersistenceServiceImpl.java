@@ -147,8 +147,8 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     final CollectionReference minMaxCollRef = recentSensorReadingDocRef.collection( "min_max" );
                     final DocumentReference todayMinMaxDocRef = minMaxCollRef.document( LocalDate.now().format( DateTimeFormatter.BASIC_ISO_DATE ) );
                     sensorData = new HashMap<>();
-                    sensorData.put( "last_sensor_reading_timestamp", new java.util.Date() );
-                    sensorData.put( "last_temperature_reading", measurement.getTemperature() );
+                    sensorData.put( "lastSensorReadingTimestamp", new java.util.Date() );
+                    sensorData.put( "lastTemperatureReading", measurement.getTemperature() );
                     final HashMap<String, Object> minMaxData = new HashMap<>();
 
                     final ApiFuture<DocumentSnapshot> documentSnapshotApiFuture = recentSensorReadingDocRef.get();
@@ -188,7 +188,10 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                                 minMaxData.put( "min_temperature", measurement.getTemperature() );
                                 minMaxData.put( "min_temperature_timestamp", new java.util.Date() );
                             }
-                            batch.update( todayMinMaxDocRef, minMaxData );
+                            if ( !minMaxData.isEmpty() )
+                            {
+                                batch.update(todayMinMaxDocRef, minMaxData);
+                            }
                         }
                     }
 
