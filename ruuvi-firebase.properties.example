@@ -1,4 +1,2 @@
 firebaseProjectId=mikinipai
-firebaseMeasurementHistoryCollectionName=measurement
-firebaseMostRecentMeasurementCollectionName=most_recent_measurements
 firebaseServiceAccountJSONPrivateKey=mikinipai-firebase.json

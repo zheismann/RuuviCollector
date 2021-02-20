@@ -20,8 +20,8 @@ public abstract class FirebaseConfig {
     private static final String FIREBASE_PROPERTIES = "ruuvi-firebase.properties";
 
     private static String firebaseProjectId;
-    private static String firebaseMeasurementHistoryCollectionName;
-    private static String firebaseMostRecentMeasurementCollectionName;
+    private static String firebaseMeasurementHistoryCollectionName="measurement";
+    private static String firebaseMostRecentMeasurementCollectionName="most_recent_measurements";
     private static Path firebaseServiceAccountJSONPrivateKey;
 
     private static Function<String, File> configFileFinder;
@@ -59,10 +59,6 @@ public abstract class FirebaseConfig {
     public static void readConfigFromProperties(final Properties props) {
         firebaseProjectId = props.getProperty("firebaseProjectId");
         LOG.debug( "firebaseProjectId = " + firebaseProjectId );
-        firebaseMeasurementHistoryCollectionName = props.getProperty("firebaseMeasurementHistoryCollectionName");
-        LOG.debug( "firebaseMeasurementHistoryCollectionName = " + firebaseMeasurementHistoryCollectionName );
-        firebaseMostRecentMeasurementCollectionName = props.getProperty("firebaseMostRecentMeasurementCollectionName");
-        LOG.debug( "firebaseMostRecentMeasurementCollectionName = " + firebaseMostRecentMeasurementCollectionName );
         LOG.debug( "props.getProperty(\"firebaseServiceAccountJSONPrivateKey\") = " + props.getProperty("firebaseServiceAccountJSONPrivateKey") );
         final File privateKeyFile = configFileFinder.apply( props.getProperty("firebaseServiceAccountJSONPrivateKey") );
         LOG.debug( "privateKeyFile = " + privateKeyFile );
@@ -78,12 +74,6 @@ public abstract class FirebaseConfig {
     private static void validateConfig() {
         if (firebaseProjectId == null || firebaseProjectId.trim().isEmpty()) {
             throw new IllegalStateException("The firebaseProjectId property must be specified in the FIREBASE_PROPERTIES file.");
-        }
-        else if ( firebaseMeasurementHistoryCollectionName == null || firebaseMeasurementHistoryCollectionName.trim().isEmpty()) {
-            throw new IllegalStateException("The firebaseMeasurementHistoryCollectionName property must be specified in the FIREBASE_PROPERTIES file.");
-        }
-        else if ( firebaseMostRecentMeasurementCollectionName == null || firebaseMostRecentMeasurementCollectionName.trim().isEmpty()) {
-            throw new IllegalStateException("The firebaseMostRecentMeasurementCollectionName property must be specified in the FIREBASE_PROPERTIES file.");
         }
         else if (firebaseServiceAccountJSONPrivateKey == null) {
             throw new IllegalStateException("The firebaseServiceAccountJSONPrivateKey property must be specified in the FIREBASE_PROPERTIES file.");
@@ -124,19 +114,19 @@ public abstract class FirebaseConfig {
     }
 
 
-    public static String getFirebaseProjectId() {
+    public static String getProjectId() {
         return firebaseProjectId;
     }
 
-    public static Path getFirebaseServiceAccountJSONPrivateKey() {
+    public static Path getServiceAccountJSONPrivateKey() {
         return firebaseServiceAccountJSONPrivateKey;
     }
 
-    public static String getFirebaseMeasurementHistoryCollectionName() {
+    public static String getMeasurementHistoryCollectionName() {
         return firebaseMeasurementHistoryCollectionName;
     }
 
-    public static String getFirebaseMostRecentMeasurementCollectionName()
+    public static String getMostRecentMeasurementCollectionName()
     {
         return firebaseMostRecentMeasurementCollectionName;
     }
