@@ -48,7 +48,7 @@ public class BeaconHandler {
         }
         if (!macAddressesFound.contains(hciData.mac)) {
             macAddressesFound.add(hciData.mac);
-            LOG.debug("Saw MAC for the first time: " + hciData.mac);
+            LOG.debug("Saw MAC for the first time: " + hciData.mac + "; rssi: " + hciData.rssi + "; battery voltage: " + measurement.getBatteryVoltage() + "; txPower: " + measurement.getTxPower() );
         }
         EnhancedRuuviMeasurement enhancedMeasurement = new EnhancedRuuviMeasurement(measurement);
         enhancedMeasurement.setMac(hciData.mac);
