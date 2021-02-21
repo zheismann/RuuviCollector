@@ -22,7 +22,6 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,8 +39,6 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
 
     private Firestore db;
     private CollectionReference measurementHistoryCollection;
-    private CollectionReference mostRecentMeasurementCollection;
-    private CollectionReference dailyTemperatureRangesCollection;
     private CollectionReference recentSensorReadingsCollection;
 
     private final ArrayBlockingQueue<EnhancedRuuviMeasurement> arrayBlockingQueue =
@@ -66,9 +63,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
 
             db = FirestoreClient.getFirestore();
             measurementHistoryCollection = db.collection( FirebaseConfig.getMeasurementHistoryCollectionName() );
-            mostRecentMeasurementCollection = db.collection( FirebaseConfig.getMostRecentMeasurementCollectionName() );
-            dailyTemperatureRangesCollection = db.collection( "daily_temperature_ranges" );
-            recentSensorReadingsCollection = db.collection( "recent_sensor_readings" );
+            recentSensorReadingsCollection = db.collection( FirebaseConfig.getRecentSensorReadingsCollectionName() );
             scheduler.scheduleWithFixedDelay( new FirebaseWriter(), 1, 1, TimeUnit.MINUTES );
         }
         catch ( Exception e )
@@ -137,13 +132,6 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     {
                         continue;
                     }
-//                    final DocumentReference mostRecentMeasurementDocument = mostRecentMeasurementCollection.document( measurement.getMac() );
-//                    Map<String, Object> sensorData = new HashMap<>();
-//                    sensorData.put( "time", new java.util.Date() );
-//                    sensorData.put( "temperature", measurement.getTemperature() );
-//                    ApiFuture<WriteResult> future = mostRecentMeasurementDocument.update( sensorData );
-//                    futures.add( future );
-
                     final DocumentReference recentSensorReadingDocRef = recentSensorReadingsCollection.document( measurement.getMac() );
                     Map<String, Object> sensorData = new HashMap<>();
                     sensorData.put( "lastSensorReadingTimestamp", new java.util.Date() );

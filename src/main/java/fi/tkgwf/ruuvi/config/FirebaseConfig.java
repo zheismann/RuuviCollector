@@ -21,7 +21,7 @@ public abstract class FirebaseConfig {
 
     private static String firebaseProjectId;
     private static String firebaseMeasurementHistoryCollectionName="measurement";
-    private static String firebaseMostRecentMeasurementCollectionName="most_recent_measurements";
+    private static String firebaseRecentSensorReadingsCollectionName ="recent_sensor_readings";
     private static Path firebaseServiceAccountJSONPrivateKey;
 
     private static Function<String, File> configFileFinder;
@@ -126,8 +126,8 @@ public abstract class FirebaseConfig {
         return firebaseMeasurementHistoryCollectionName;
     }
 
-    public static String getMostRecentMeasurementCollectionName()
+    public static String getRecentSensorReadingsCollectionName()
     {
-        return firebaseMostRecentMeasurementCollectionName;
+        return firebaseRecentSensorReadingsCollectionName;
     }
 }
