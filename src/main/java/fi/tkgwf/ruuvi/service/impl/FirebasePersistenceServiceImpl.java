@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -136,65 +137,66 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     {
                         continue;
                     }
-                    final DocumentReference mostRecentMeasurementDocument = mostRecentMeasurementCollection.document( measurement.getMac() );
-                    Map<String, Object> sensorData = new HashMap<>();
-                    sensorData.put( "time", new java.util.Date() );
-                    sensorData.put( "temperature", measurement.getTemperature() );
-                    ApiFuture<WriteResult> future = mostRecentMeasurementDocument.update( sensorData );
-                    futures.add( future );
+//                    final DocumentReference mostRecentMeasurementDocument = mostRecentMeasurementCollection.document( measurement.getMac() );
+//                    Map<String, Object> sensorData = new HashMap<>();
+//                    sensorData.put( "time", new java.util.Date() );
+//                    sensorData.put( "temperature", measurement.getTemperature() );
+//                    ApiFuture<WriteResult> future = mostRecentMeasurementDocument.update( sensorData );
+//                    futures.add( future );
 
                     final DocumentReference recentSensorReadingDocRef = recentSensorReadingsCollection.document( measurement.getMac() );
-                    final CollectionReference minMaxCollRef = recentSensorReadingDocRef.collection( "min_max" );
-                    final DocumentReference todayMinMaxDocRef = minMaxCollRef.document( LocalDate.now().format( DateTimeFormatter.BASIC_ISO_DATE ) );
-                    sensorData = new HashMap<>();
+                    Map<String, Object> sensorData = new HashMap<>();
                     sensorData.put( "lastSensorReadingTimestamp", new java.util.Date() );
                     sensorData.put( "lastTemperatureReading", measurement.getTemperature() );
-                    final HashMap<String, Object> minMaxData = new HashMap<>();
 
                     final ApiFuture<DocumentSnapshot> documentSnapshotApiFuture = recentSensorReadingDocRef.get();
                     final DocumentSnapshot documentSnapshot = documentSnapshotApiFuture.get();
                     if ( !documentSnapshot.exists() )
                     {
+                        final HashMap<String, Map<String,Object>> dailyMinMaxRecords = new HashMap<>();
+                        sensorData.put( "dailyMinMaxRecords", dailyMinMaxRecords );
+                        final Map<String,Object> minMaxData = new HashMap<>();
+                        minMaxData.put( "maxTemperatureReading", measurement.getTemperature() );
+                        minMaxData.put( "maxTemperatureTimestamp", new java.util.Date() );
+                        minMaxData.put( "minTemperatureReading", measurement.getTemperature() );
+                        minMaxData.put( "minTemperatureTimestamp", new java.util.Date() );
+                        dailyMinMaxRecords.put( LocalDate.now().format( DateTimeFormatter.BASIC_ISO_DATE ), minMaxData );
                         batch.create( recentSensorReadingDocRef, sensorData );
-                        minMaxData.put( "max_temperature", measurement.getTemperature() );
-                        minMaxData.put( "max_temperature_timestamp", new java.util.Date() );
-                        minMaxData.put( "min_temperature", measurement.getTemperature() );
-                        minMaxData.put( "min_temperature_timestamp", new java.util.Date() );
-                        batch.create( todayMinMaxDocRef, minMaxData );
                     }
                     else
                     {
-                        batch.update( recentSensorReadingDocRef, sensorData );
-                        final DocumentSnapshot minMaxDocSnapshot = todayMinMaxDocRef.get().get();
-                        if ( !minMaxDocSnapshot.exists() )
+                        final Map<String, Map<String,Object>> dailyMinMaxRecords = (Map<String, Map<String,Object>>)documentSnapshot.get( "dailyMinMaxRecords" );
+                        final String todayBasicISODateStr = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+                        if ( dailyMinMaxRecords.containsKey( todayBasicISODateStr ) )
                         {
-                            minMaxData.put( "max_temperature", measurement.getTemperature() );
-                            minMaxData.put( "max_temperature_timestamp", new java.util.Date() );
-                            minMaxData.put( "min_temperature", measurement.getTemperature() );
-                            minMaxData.put( "min_temperature_timestamp", new java.util.Date() );
-                            batch.create( todayMinMaxDocRef, minMaxData );
+                            sensorData.put("dailyMinMaxRecords", dailyMinMaxRecords );
+                            final Map<String, Object> minMaxData = dailyMinMaxRecords.get( todayBasicISODateStr );
+                            final double currentMaxTemperature = ( Double ) minMaxData.get( "maxTemperatureReading" );
+                            if ( measurement.getTemperature() >= currentMaxTemperature )
+                            {
+                                minMaxData.put( "maxTemperatureReading", measurement.getTemperature() );
+                                minMaxData.put( "maxTemperatureTimestamp", new java.util.Date() );
+                            }
+                            final double currentMinTemperature = ( Double ) minMaxData.get( "minTemperatureReading" );
+                            if ( measurement.getTemperature() <= currentMinTemperature )
+                            {
+                                minMaxData.put( "minTemperatureReading", measurement.getTemperature() );
+                                minMaxData.put( "minTemperatureTimestamp", new java.util.Date() );
+                            }
                         }
                         else
                         {
-                            final double currentMaxTemperature = ( Double ) minMaxDocSnapshot.get( "max_temperature" );
-                            if ( measurement.getTemperature() >= currentMaxTemperature )
-                            {
-                                minMaxData.put( "max_temperature", measurement.getTemperature() );
-                                minMaxData.put( "max_temperature_timestamp", new java.util.Date() );
-                            }
-                            final double currentMinTemperature = ( Double ) minMaxDocSnapshot.get( "min_temperature" );
-                            if ( measurement.getTemperature() <= currentMinTemperature )
-                            {
-                                minMaxData.put( "min_temperature", measurement.getTemperature() );
-                                minMaxData.put( "min_temperature_timestamp", new java.util.Date() );
-                            }
-                            if ( !minMaxData.isEmpty() )
-                            {
-                                batch.update(todayMinMaxDocRef, minMaxData);
-                            }
+                            HashMap<String, Object> minMaxData = new HashMap<>();
+                            dailyMinMaxRecords.put( todayBasicISODateStr, minMaxData );
+                            sensorData.put("dailyMinMaxRecords", dailyMinMaxRecords );
+                            minMaxData.put( "maxTemperatureReading", measurement.getTemperature() );
+                            minMaxData.put( "maxTemperatureTimestamp", new java.util.Date() );
+                            minMaxData.put( "minTemperatureReading", measurement.getTemperature() );
+                            minMaxData.put( "minTemperatureTimestamp", new java.util.Date() );
                         }
+                        LOG.info( "batch.update( recentSensorReadingDocRef, "+sensorData+" ) " );
+                        batch.update( recentSensorReadingDocRef, sensorData );
                     }
-
 
                     final DocumentReference ruuviMeasurementDocument = measurementHistoryCollection.document();
                     Map<String, Object> data = new HashMap<>();
