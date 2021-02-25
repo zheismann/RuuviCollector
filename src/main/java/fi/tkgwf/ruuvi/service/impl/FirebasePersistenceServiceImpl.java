@@ -15,7 +15,8 @@ import com.google.firebase.cloud.FirestoreClient;
 import fi.tkgwf.ruuvi.bean.EnhancedRuuviMeasurement;
 import fi.tkgwf.ruuvi.config.FirebaseConfig;
 import fi.tkgwf.ruuvi.service.PersistenceService;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -35,7 +36,7 @@ import java.util.concurrent.TimeUnit;
 
 public class FirebasePersistenceServiceImpl implements PersistenceService
 {
-    private static final Logger LOG = Logger.getLogger( FirebasePersistenceServiceImpl.class );
+    private static final Logger LOG = LogManager.getLogger( FirebasePersistenceServiceImpl.class );
 
     private Firestore db;
     private CollectionReference measurementHistoryCollection;

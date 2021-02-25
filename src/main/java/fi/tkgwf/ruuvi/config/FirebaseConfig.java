@@ -1,6 +1,7 @@
 package fi.tkgwf.ruuvi.config;
 
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -16,7 +17,7 @@ import java.util.function.Function;
 
 public abstract class FirebaseConfig {
 
-    private static final Logger LOG = Logger.getLogger(FirebaseConfig.class);
+    private static final Logger LOG = LogManager.getLogger(FirebaseConfig.class);
     private static final String FIREBASE_PROPERTIES = "ruuvi-firebase.properties";
 
     private static String firebaseProjectId;

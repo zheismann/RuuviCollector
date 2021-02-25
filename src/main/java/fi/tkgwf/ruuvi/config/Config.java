@@ -11,7 +11,8 @@ import fi.tkgwf.ruuvi.strategy.impl.DiscardUntilEnoughTimeHasElapsedStrategy;
 import fi.tkgwf.ruuvi.utils.InfluxDBConverter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,7 +40,7 @@ import static java.util.stream.Collectors.toSet;
 
 public abstract class Config {
 
-    private static final Logger LOG = Logger.getLogger(Config.class);
+    private static final Logger LOG = LogManager.getLogger(Config.class);
     private static final String RUUVI_COLLECTOR_PROPERTIES = "ruuvi-collector.properties";
     private static final String RUUVI_NAMES_PROPERTIES = "ruuvi-names.properties";
 

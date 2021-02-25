@@ -21,7 +21,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.influxdb.InfluxDB;
 import org.influxdb.InfluxDBFactory;
 import org.influxdb.dto.Query;
@@ -34,7 +35,7 @@ import org.influxdb.dto.QueryResult.Result;
  */
 public class InfluxDataMigrator {
 
-    private static final Logger LOG = Logger.getLogger(InfluxDataMigrator.class);
+    private static final Logger LOG = LogManager.getLogger(InfluxDataMigrator.class);
     private static final int QUEUE_SIZE = 4000;
     private static final int QUERY_SIZE = 2000;
     private static final int BATCH_SIZE = 2000;

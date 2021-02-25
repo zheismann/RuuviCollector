@@ -6,7 +6,8 @@ import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.SimpleCollector;
 import io.prometheus.client.exporter.HTTPServer;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -16,7 +17,7 @@ import java.util.Optional;
  */
 public final class PrometheusExporter implements DBConnection {
 
-    private static final Logger LOG = Logger.getLogger(Main.class);
+    private static final Logger LOG = LogManager.getLogger(Main.class);
 
     private static final String NAMESPACE = "ruuvi";
     private static final String TAG_MAC_LABEL = "tag_mac";
