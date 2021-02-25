@@ -15,14 +15,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
-
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 /**
  * Creates {@link RuuviMeasurement} instances from raw dumps from hcidump.
  */
 public class BeaconHandler {
 
-    private static final Logger LOG = Logger.getLogger(BeaconHandler.class);
+    private static final Logger LOG = LogManager.getLogger(BeaconHandler.class);
     private final DataFormatParser parser = new AnyDataFormatParser();
     private final Set<String> macAddressesFound = new HashSet<>();
 
