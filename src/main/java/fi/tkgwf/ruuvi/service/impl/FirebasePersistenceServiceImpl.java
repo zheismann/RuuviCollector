@@ -155,6 +155,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                     else
                     {
                         final Map<String, Map<String,Object>> dailyMinMaxRecords = (Map<String, Map<String,Object>>)documentSnapshot.get( "dailyMinMaxRecords" );
+                        LOG.info( "dailyMinMaxRecords.count(): " + ( ( dailyMinMaxRecords != null ) ? String.valueOf( dailyMinMaxRecords.size() ) : "null" ) );
                         final String todayBasicISODateStr = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
                         if ( dailyMinMaxRecords.containsKey( todayBasicISODateStr ) )
                         {
