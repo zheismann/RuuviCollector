@@ -232,6 +232,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 catch ( Throwable t )
                 {
                     LOG.error( "Encountered error while waiting on an ApiFuture to complete. " + t.getMessage(), t );
+                    completedBatchFutures.add( future );
                 }
             }
             batchFutures.removeAll( completedBatchFutures );
