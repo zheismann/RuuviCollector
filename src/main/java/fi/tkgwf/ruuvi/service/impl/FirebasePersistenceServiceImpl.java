@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -140,6 +141,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
 
                     final ApiFuture<DocumentSnapshot> documentSnapshotApiFuture = recentSensorReadingDocRef.get();
                     final DocumentSnapshot documentSnapshot = documentSnapshotApiFuture.get();
+                    final LocalDate today = LocalDate.now();
                     if ( !documentSnapshot.exists() )
                     {
                         final HashMap<String, Map<String,Object>> dailyMinMaxRecords = new HashMap<>();
@@ -149,14 +151,14 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                         minMaxData.put( "maxTemperatureTimestamp", new java.util.Date() );
                         minMaxData.put( "minTemperatureReading", measurement.getTemperature() );
                         minMaxData.put( "minTemperatureTimestamp", new java.util.Date() );
-                        dailyMinMaxRecords.put( LocalDate.now().format( DateTimeFormatter.BASIC_ISO_DATE ), minMaxData );
+                        dailyMinMaxRecords.put( today.format( DateTimeFormatter.BASIC_ISO_DATE ), minMaxData );
                         batch.create( recentSensorReadingDocRef, sensorData );
                     }
                     else
                     {
                         final Map<String, Map<String,Object>> dailyMinMaxRecords = (Map<String, Map<String,Object>>)documentSnapshot.get( "dailyMinMaxRecords" );
-                        LOG.info( "dailyMinMaxRecords.count(): " + ( ( dailyMinMaxRecords != null ) ? String.valueOf( dailyMinMaxRecords.size() ) : "null" ) );
-                        final String todayBasicISODateStr = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+                        removeOlderMinMaxRecordMaps( today, dailyMinMaxRecords );
+                        final String todayBasicISODateStr = today.format(DateTimeFormatter.BASIC_ISO_DATE);
                         if ( dailyMinMaxRecords.containsKey( todayBasicISODateStr ) )
                         {
                             sensorData.put("dailyMinMaxRecords", dailyMinMaxRecords );
@@ -215,6 +217,19 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
             catch ( Throwable t )
             {
                 LOG.error( "Encountered error in FirebaseWriter. " + t.getMessage(), t );
+            }
+        }
+
+        private void removeOlderMinMaxRecordMaps( LocalDate today, Map<String, Map<String, Object>> dailyMinMaxRecords )
+        {
+            LocalDate previousDay = today.minus( 5, ChronoUnit.DAYS );
+            String previousISODateStr = previousDay.format( DateTimeFormatter.BASIC_ISO_DATE );
+            while ( dailyMinMaxRecords.containsKey( previousISODateStr ) )
+            {
+                dailyMinMaxRecords.remove( previousISODateStr );
+                LOG.debug( "Removed min max record map for " + previousISODateStr );
+                previousDay = previousDay.minus( 1, ChronoUnit.DAYS );
+                previousISODateStr = previousDay.format( DateTimeFormatter.BASIC_ISO_DATE );
             }
         }
 
