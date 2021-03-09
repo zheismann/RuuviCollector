@@ -79,7 +79,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
             measurementHistoryCollection = db.collection( FirebaseConfig.getMeasurementHistoryCollectionName() );
             recentSensorReadingsCollection = db.collection( FirebaseConfig.getRecentSensorReadingsCollectionName() );
             scheduler.scheduleWithFixedDelay( new FirebaseWriter(), 1, 1, TimeUnit.MINUTES );
-            firebaseCloudMessagingManager = new FirebaseCloudMessagingManager( db );
+            firebaseCloudMessagingManager = new FirebaseCloudMessagingManager();
             firebaseCloudMessagingManager.configureTopicListeners();
         }
         catch ( Exception e )
@@ -304,47 +304,63 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
         {
             boolean shouldBeRecorded = true;
             String currentMAC = t.getMac();
-            Long currentMeasurementTime = t.getTime();
-            Double currentTemperature = t.getTemperature();
             if ( recordedMeasurementsMap.containsKey( currentMAC ) )
             {
-                Long previousMeasurementTime = recordedMeasurementsMap.get( currentMAC ).getTime();
-                Double previousTemperature = recordedMeasurementsMap.get( currentMAC ).getTemperature();
-                final int ONE_MINUTE_IN_MILLISECONDS = 1000 * 60;
-                if ( ( currentMeasurementTime - previousMeasurementTime ) < ONE_MINUTE_IN_MILLISECONDS )
+                final boolean moreThanOneMinuteHasPassed = hasMoreThanOneMinutePassedSinceLastRecording( t );
+                if ( !moreThanOneMinuteHasPassed )
                 {
                     shouldBeRecorded = false;
                 }
-                // a temperature difference of more than 1 degree fahrenheit / 0.56 celsius should be reported
-                // even if less than a minute has passed
-                if ( Math.abs( currentTemperature - previousTemperature ) >= 0.56D )
+                // even if a full minute has not passed yet and
+                // a temperature difference of more than 1 degree fahrenheit / 0.56 celsius has occurred
+                // this should be recorded!
+                if ( !moreThanOneMinuteHasPassed && moreThanOneDegreeFahrenheitDifferenceSinceLastRecording( t ) )
                 {
                     shouldBeRecorded = true;
                 }
             }
             return shouldBeRecorded;
         }
+
+        private boolean moreThanOneDegreeFahrenheitDifferenceSinceLastRecording( EnhancedRuuviMeasurement t )
+        {
+            String currentMAC = t.getMac();
+            Double currentTemperature = t.getTemperature();
+            Double previousTemperature = recordedMeasurementsMap.get( currentMAC ).getTemperature();
+            return Math.abs( currentTemperature - previousTemperature ) >= 0.56D;
+        }
+
+        private static final int ONE_MINUTE_IN_MILLISECONDS = 1000 * 60;
+        // TODO: should use UTC dates instead to avoid time change issues
+        private boolean hasMoreThanOneMinutePassedSinceLastRecording( EnhancedRuuviMeasurement t )
+        {
+            String currentMAC = t.getMac();
+            Long currentMeasurementTime = t.getTime();
+            Long previousMeasurementTime = recordedMeasurementsMap.get( currentMAC ).getTime();
+            return ( currentMeasurementTime - previousMeasurementTime ) >= ONE_MINUTE_IN_MILLISECONDS;
+        }
     }
 
-    private static class FirebaseCloudMessagingManager
+    private class FirebaseCloudMessagingManager
     {
         private CollectionReference fcmRegistrationTokensCollection;
-        private Firestore db;
         private static final String TEMPERATURE_NOTIFICATION_TOPIC = "temperatureNotification";
 
-        public FirebaseCloudMessagingManager( Firestore db )
+        public FirebaseCloudMessagingManager()
         {
-            this.db = db;
             fcmRegistrationTokensCollection = db.collection( FirebaseConfig.getFCMRegistrationTokensCollectionName() );
         }
 
         public void handleNewMeasurement( EnhancedRuuviMeasurement measurement )
         {
-            try
-            {
+            // TODO: figure out notification use cases...
+//            try
+//            {
                 final Double temperature = measurement.getTemperature();
                 if ( temperature <= 10.00D || temperature >= 80.60D )
                 {
+                    LOG.info( "Going to send message! 'temperature <= 10.00D': " + (temperature <= 10.00D) + "\t'temperature >= 80.60D': " + (temperature >= 80.60D) );
+/*
                     Message message = Message.builder()
                         .putData("temperature", String.valueOf( temperature ) )
                         .putData("time", String.valueOf( measurement.getTime() ) )
@@ -352,12 +368,15 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                         .build();
                     String fcmMessageSendResponse = FirebaseMessaging.getInstance().send( message );
                     LOG.info( "fcmMessageSendResponse = " + fcmMessageSendResponse + "\t for message: " + message );
+*/
                 }
+/*
             }
             catch ( FirebaseMessagingException e )
             {
                 LOG.error( "Failure while sending Firebase Cloud Message", e );
             }
+*/
         }
 
         public void configureTopicListeners()
