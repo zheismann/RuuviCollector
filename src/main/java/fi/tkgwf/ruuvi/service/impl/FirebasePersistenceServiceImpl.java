@@ -27,6 +27,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +43,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
     private Firestore db;
     private CollectionReference measurementHistoryCollection;
     private CollectionReference recentSensorReadingsCollection;
+    private FirebaseCloudMessagingManager firebaseCloudMessagingManager;
 
     private final ArrayBlockingQueue<EnhancedRuuviMeasurement> arrayBlockingQueue =
         new ArrayBlockingQueue<>( 250000, true );
@@ -67,6 +69,8 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
             measurementHistoryCollection = db.collection( FirebaseConfig.getMeasurementHistoryCollectionName() );
             recentSensorReadingsCollection = db.collection( FirebaseConfig.getRecentSensorReadingsCollectionName() );
             scheduler.scheduleWithFixedDelay( new FirebaseWriter(), 1, 1, TimeUnit.MINUTES );
+            firebaseCloudMessagingManager = new FirebaseCloudMessagingManager( db );
+            firebaseCloudMessagingManager.configureTopicListeners();
         }
         catch ( Exception e )
         {
@@ -294,6 +298,29 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 }
             }
             return shouldBeRecorded;
+        }
+    }
+
+    private static class FirebaseCloudMessagingManager
+    {
+        private CollectionReference fcmRegistrationTokensCollection;
+        private Firestore db;
+
+        public FirebaseCloudMessagingManager( Firestore db )
+        {
+            this.db = db;
+            fcmRegistrationTokensCollection = db.collection( FirebaseConfig.getFCMRegistrationTokensCollectionName() );
+        }
+
+        public void configureTopicListeners()
+        {
+            final Iterable<DocumentReference> documentReferences = fcmRegistrationTokensCollection.listDocuments();
+            final Iterator<DocumentReference> iterator = documentReferences.iterator();
+            while( iterator.hasNext() )
+            {
+                final DocumentReference next = iterator.next();
+                LOG.info( "next.getId() = " + next.getId() );
+            }
         }
     }
 }

@@ -23,6 +23,7 @@ public abstract class FirebaseConfig {
     private static String firebaseProjectId;
     private static String firebaseMeasurementHistoryCollectionName="measurement";
     private static String firebaseRecentSensorReadingsCollectionName ="recent_sensor_readings";
+    private static String firebaseCloudMessagingRegistrationTokensCollectionName ="fcm_registration_tokens";
     private static Path firebaseServiceAccountJSONPrivateKey;
 
     private static Function<String, File> configFileFinder;
@@ -130,5 +131,10 @@ public abstract class FirebaseConfig {
     public static String getRecentSensorReadingsCollectionName()
     {
         return firebaseRecentSensorReadingsCollectionName;
+    }
+
+    public static String getFCMRegistrationTokensCollectionName()
+    {
+        return firebaseCloudMessagingRegistrationTokensCollectionName;
     }
 }
