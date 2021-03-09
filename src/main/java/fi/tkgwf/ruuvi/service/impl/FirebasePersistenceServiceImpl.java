@@ -3,21 +3,29 @@ package fi.tkgwf.ruuvi.service.impl;
 import com.google.api.core.ApiFuture;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.firestore.CollectionReference;
+import com.google.cloud.firestore.DocumentChange;
 import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.DocumentSnapshot;
+import com.google.cloud.firestore.EventListener;
 import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.FirestoreException;
+import com.google.cloud.firestore.QuerySnapshot;
 import com.google.cloud.firestore.WriteBatch;
 import com.google.cloud.firestore.WriteResult;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.cloud.FirestoreClient;
 
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.TopicManagementResponse;
 import fi.tkgwf.ruuvi.bean.EnhancedRuuviMeasurement;
 import fi.tkgwf.ruuvi.config.FirebaseConfig;
 import fi.tkgwf.ruuvi.service.PersistenceService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.annotation.Nullable;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -25,6 +33,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -305,6 +314,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
     {
         private CollectionReference fcmRegistrationTokensCollection;
         private Firestore db;
+        private static final String TEMPERATURE_NOTIFICATION_TOPIC = "temperatureNotification";
 
         public FirebaseCloudMessagingManager( Firestore db )
         {
@@ -321,6 +331,57 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 final DocumentReference next = iterator.next();
                 LOG.info( "next.getId() = " + next.getId() );
             }
+
+            EventListener<QuerySnapshot> listener = new EventListener<QuerySnapshot>()
+            {
+                @Override
+                public void onEvent( @Nullable QuerySnapshot value, @Nullable FirestoreException error )
+                {
+                    LOG.info("EventListener::onEvent()");
+                    if (error != null)
+                    {
+                        LOG.warn("onEvent:error", error);
+                        return;
+                    }
+
+                    // Dispatch the event
+                    for ( DocumentChange change : value.getDocumentChanges() )
+                    {
+                        // Snapshot of the changed document
+                        DocumentSnapshot snapshot = change.getDocument();
+                        String fcmToken = null;
+                        switch (change.getType()) {
+                            case ADDED:
+                                fcmToken = change.getDocument().getId();
+                                try
+                                {
+                                    TopicManagementResponse response = FirebaseMessaging.getInstance().subscribeToTopic(
+                                        Arrays.asList( fcmToken ), TEMPERATURE_NOTIFICATION_TOPIC);
+                                }
+                                catch ( FirebaseMessagingException e )
+                                {
+                                    LOG.error( "Failed subscribing Firebase Cloud Messaging token: '" + fcmToken + "' to topic: " + TEMPERATURE_NOTIFICATION_TOPIC, e );
+                                }
+                                break;
+                            case REMOVED:
+                                fcmToken = change.getDocument().getId();
+                                try
+                                {
+                                    TopicManagementResponse response = FirebaseMessaging.getInstance().unsubscribeFromTopic(
+                                        Arrays.asList( fcmToken ), TEMPERATURE_NOTIFICATION_TOPIC);
+                                    LOG.debug("unsubscribeFromTopic " + fcmToken + "\tsuccess count: " + response.getSuccessCount() + "\tfailure count: " + response.getFailureCount()  );
+                                }
+                                catch ( FirebaseMessagingException e )
+                                {
+                                    LOG.error( "Failed unsubscribing Firebase Cloud Messaging token: '" + fcmToken + "' to topic: " + TEMPERATURE_NOTIFICATION_TOPIC, e );
+                                }
+
+                                break;
+                        }
+                    }
+                }
+            };
+            fcmRegistrationTokensCollection.addSnapshotListener( listener );
         }
     }
 }
