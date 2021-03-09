@@ -329,7 +329,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
             try
             {
                 final Double temperature = measurement.getTemperature();
-                if ( temperature <= 50.00D || temperature >= 80.00D )
+                if ( temperature <= 10.00D || temperature >= 80.60D )
                 {
                     Message message = Message.builder()
                         .putData("temperature", String.valueOf( temperature ) )
