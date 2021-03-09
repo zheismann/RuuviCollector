@@ -18,6 +18,7 @@ import com.google.firebase.cloud.FirestoreClient;
 
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.TopicManagementResponse;
 import fi.tkgwf.ruuvi.bean.EnhancedRuuviMeasurement;
 import fi.tkgwf.ruuvi.config.FirebaseConfig;
@@ -143,6 +144,7 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 Set<String> macAddresses = new HashSet<>();
                 for ( EnhancedRuuviMeasurement measurement : measurementsRecorded )
                 {
+                    firebaseCloudMessagingManager.handleNewMeasurement( measurement );
                     if ( !shouldBeRecorded( measurement ) )
                     {
                         continue;
@@ -320,6 +322,28 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
         {
             this.db = db;
             fcmRegistrationTokensCollection = db.collection( FirebaseConfig.getFCMRegistrationTokensCollectionName() );
+        }
+
+        public void handleNewMeasurement( EnhancedRuuviMeasurement measurement )
+        {
+            try
+            {
+                final Double temperature = measurement.getTemperature();
+                if ( temperature <= 50.00D || temperature >= 80.00D )
+                {
+                    Message message = Message.builder()
+                        .putData("temperature", String.valueOf( temperature ) )
+                        .putData("time", String.valueOf( measurement.getTime() ) )
+                        .setTopic( TEMPERATURE_NOTIFICATION_TOPIC )
+                        .build();
+                    String fcmMessageSendResponse = FirebaseMessaging.getInstance().send( message );
+                    LOG.info( "fcmMessageSendResponse = " + fcmMessageSendResponse + "\t for message: " + message );
+                }
+            }
+            catch ( FirebaseMessagingException e )
+            {
+                LOG.error( "Failure while sending Firebase Cloud Message", e );
+            }
         }
 
         public void configureTopicListeners()
