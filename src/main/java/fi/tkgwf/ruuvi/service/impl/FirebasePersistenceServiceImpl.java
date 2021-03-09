@@ -144,11 +144,11 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
                 Set<String> macAddresses = new HashSet<>();
                 for ( EnhancedRuuviMeasurement measurement : measurementsRecorded )
                 {
-                    firebaseCloudMessagingManager.handleNewMeasurement( measurement );
                     if ( !shouldBeRecorded( measurement ) )
                     {
                         continue;
                     }
+                    firebaseCloudMessagingManager.handleNewMeasurement( measurement );
                     final DocumentReference recentSensorReadingDocRef = recentSensorReadingsCollection.document( measurement.getMac() );
                     Map<String, Object> sensorData = new HashMap<>();
                     sensorData.put( "lastSensorReadingTimestamp", new java.util.Date() );
@@ -294,18 +294,32 @@ public class FirebasePersistenceServiceImpl implements PersistenceService
             }
         }
 
+        /**
+         * Determines if a measurement should be recorded
+         * @param t
+         * @return true if more than a minute has passed since the last recording
+         * or if the change in temperature is more than 1 degree fahrenheit / 0.56 celsius
+         */
         private boolean shouldBeRecorded( EnhancedRuuviMeasurement t )
         {
             boolean shouldBeRecorded = true;
             String currentMAC = t.getMac();
             Long currentMeasurementTime = t.getTime();
+            Double currentTemperature = t.getTemperature();
             if ( recordedMeasurementsMap.containsKey( currentMAC ) )
             {
                 Long previousMeasurementTime = recordedMeasurementsMap.get( currentMAC ).getTime();
+                Double previousTemperature = recordedMeasurementsMap.get( currentMAC ).getTemperature();
                 final int ONE_MINUTE_IN_MILLISECONDS = 1000 * 60;
                 if ( ( currentMeasurementTime - previousMeasurementTime ) < ONE_MINUTE_IN_MILLISECONDS )
                 {
                     shouldBeRecorded = false;
+                }
+                // a temperature difference of more than 1 degree fahrenheit / 0.56 celsius should be reported
+                // even if less than a minute has passed
+                if ( Math.abs( currentTemperature - previousTemperature ) >= 0.56D )
+                {
+                    shouldBeRecorded = true;
                 }
             }
             return shouldBeRecorded;
